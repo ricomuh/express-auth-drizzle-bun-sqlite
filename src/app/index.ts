@@ -7,6 +7,7 @@ import {
   verifyResetPassword,
   resetPassword,
   getUser,
+  refreshToken,
 } from "@/actions/auth";
 import type { BasicResponse } from "@/types/response";
 import type { User } from "@/types/auth";
@@ -19,6 +20,7 @@ import {
 } from "@/requests/auth";
 import { authMiddleware } from "@/middleware";
 import { ErrorResponse, errorResponse } from "@/types/exceptions";
+import { getBearerToken } from "@/lib/auth";
 
 const app: Express = express();
 
@@ -89,6 +91,35 @@ app.post(
       const result = await login(email, password);
 
       res.json(result);
+    } catch (error) {
+      const response = errorResponse(error as ErrorResponse);
+      res.status(response.status).json(response);
+    }
+  }
+);
+
+// refresh token
+app.post(
+  "/auth/refresh",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const token = getBearerToken(req);
+
+      if (!token) {
+        throw new ErrorResponse("Token not provided", 401, 401);
+      }
+
+      const newToken = await refreshToken(token);
+
+      if (!newToken) {
+        throw new ErrorResponse("Invalid token", 401, 401);
+      }
+
+      res.json({
+        data: {
+          token: newToken,
+        },
+      } as BasicResponse<{ token: string }>);
     } catch (error) {
       const response = errorResponse(error as ErrorResponse);
       res.status(response.status).json(response);
