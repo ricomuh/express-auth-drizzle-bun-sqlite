@@ -7,6 +7,7 @@ import type { LoginResponse, User } from "@/types/auth";
 import type { BasicResponse, ErrorResponse } from "@/types/response";
 // import jwt
 import jwt from "jsonwebtoken";
+import { sendEmail } from "./email";
 
 export async function authMiddleware(
   req: Request,
@@ -214,12 +215,22 @@ export async function requestResetPassword(
     } as ErrorResponse;
   }
 
-  await db.insert(schema.resetPasswords).values({
-    uuid: crypto.randomUUID(),
-    user_id: user.uuid,
-    code: (1000 + Math.floor(Math.random() * 9999)).toString(),
-    expires_at: new Date(Date.now() + 3600000).toISOString(),
-  });
+  const [resetPassword] = await db
+    .insert(schema.resetPasswords)
+    .values({
+      uuid: crypto.randomUUID(),
+      user_id: user.uuid,
+      code: (1000 + Math.floor(Math.random() * 9999)).toString(),
+      expires_at: new Date(Date.now() + 3600000).toISOString(),
+    })
+    .returning();
+
+  // send email
+  await sendEmail(
+    email,
+    "Reset Password",
+    `Your verification code is ${resetPassword.code}`
+  );
 
   return {
     message: "Reset password request sent",
