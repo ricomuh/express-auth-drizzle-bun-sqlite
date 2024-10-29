@@ -296,20 +296,33 @@ export async function resetPassword(
     where: eq(schema.users.email, email),
   });
 
+  if (!user) {
+    return {
+      error: {
+        message: "User not found",
+        code: 404,
+      },
+      status: 404,
+    } as ErrorResponse;
+  }
+
   await db
     .update(schema.users)
     .set({
       password: hashedPassword,
     })
-    .where(eq(schema.users.uuid, user?.uuid || ""));
+    .where(eq(schema.users.uuid, user.uuid));
 
   // remove all the tokens of this user
+  await db.delete(schema.tokens).where(eq(schema.tokens.user_id, user.uuid));
+
+  // remove the reset password token
   await db
-    .delete(schema.tokens)
-    .where(eq(schema.tokens.user_id, user?.uuid || ""));
+    .delete(schema.resetPasswords)
+    .where(eq(schema.resetPasswords.user_id, user.uuid));
 
   return {
-    message: "Password reset",
+    message: "Password reset successful.",
     status: 200,
   } as BasicResponse<null>;
 }

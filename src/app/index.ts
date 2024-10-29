@@ -14,6 +14,7 @@ import {
   loginRequest,
   registerRequest,
   resetPasswordRequest,
+  updatePasswordRequest,
   verifyResetPasswordRequest,
 } from "@/requests/auth";
 
@@ -114,7 +115,7 @@ app.post(
 // reset password
 app.post(
   "/reset-password",
-  resetPasswordRequest,
+  updatePasswordRequest,
   async (req: Request, res: Response): Promise<void> => {
     const { email, code, password } = req.body;
 
