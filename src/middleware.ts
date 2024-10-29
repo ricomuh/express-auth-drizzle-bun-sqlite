@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { verifyToken } from "./actions/auth";
 import {
+  errorResponse,
   ErrorResponse,
   internalServerError,
   UnauthorizedError,
@@ -29,14 +30,8 @@ export async function authMiddleware(
 
     next();
   } catch (error) {
-    if (error instanceof ErrorResponse) {
-      res.status(error.status).json({
-        error: {
-          code: error.code,
-          message: error.message,
-        },
-      });
-    }
-    return internalServerError;
+    const response =
+      errorResponse(error as ErrorResponse) || internalServerError;
+    res.status(response.status).json(response);
   }
 }

@@ -17,6 +17,7 @@ import {
   verifyResetPasswordRequest,
 } from "@/requests/auth";
 import { authMiddleware } from "@/middleware";
+import { ErrorResponse, errorResponse } from "@/types/exceptions";
 
 const app: Express = express();
 
@@ -32,16 +33,16 @@ app.post(
   "/auth/register",
   registerRequest,
   async (req: Request, res: Response): Promise<void> => {
-    const { name, email, password } = req.body;
+    try {
+      const { name, email, password } = req.body;
 
-    const result = await register(name, email, password);
+      const result = await register(name, email, password);
 
-    if (result.error) {
-      res.status(result.status ?? 404).json(result);
-      return;
+      res.status(result.status).json(result);
+    } catch (error) {
+      const response = errorResponse(error as ErrorResponse);
+      res.status(response.status).json(response);
     }
-
-    res.json(result);
   }
 );
 
@@ -50,16 +51,16 @@ app.post(
   "/auth/login",
   loginRequest,
   async (req: Request, res: Response): Promise<void> => {
-    const { email, password } = req.body;
+    try {
+      const { email, password } = req.body;
 
-    const result = await login(email, password);
+      const result = await login(email, password);
 
-    if (result.error) {
-      res.status(result.error.code ?? 404).json(result);
-      return;
+      res.json(result);
+    } catch (error) {
+      const response = errorResponse(error as ErrorResponse);
+      res.status(response.status).json(response);
     }
-
-    res.json(result);
   }
 );
 
@@ -81,16 +82,16 @@ app.post(
   "/reset-password/request",
   resetPasswordRequest,
   async (req: Request, res: Response): Promise<void> => {
-    const { email } = req.body;
+    try {
+      const { email } = req.body;
 
-    const result = await requestResetPassword(email);
+      const result = await requestResetPassword(email);
 
-    if (result.error) {
-      res.status(result.error.code ?? 404).json(result);
-      return;
+      res.json(result);
+    } catch (error) {
+      const response = errorResponse(error as ErrorResponse);
+      res.status(response.status).json(response);
     }
-
-    res.json(result);
   }
 );
 
@@ -99,16 +100,16 @@ app.post(
   "/reset-password/verify",
   verifyResetPasswordRequest,
   async (req: Request, res: Response): Promise<void> => {
-    const { email, code } = req.body;
+    try {
+      const { email, code } = req.body;
 
-    const result = await verifyResetPassword(email, code);
+      const result = await verifyResetPassword(email, code);
 
-    if (result.error) {
-      res.status(result.error.code ?? 404).json(result);
-      return;
+      res.json(result);
+    } catch (error) {
+      const response = errorResponse(error as ErrorResponse);
+      res.status(response.status).json(response);
     }
-
-    res.json(result);
   }
 );
 
@@ -117,16 +118,16 @@ app.post(
   "/reset-password",
   updatePasswordRequest,
   async (req: Request, res: Response): Promise<void> => {
-    const { email, code, password } = req.body;
+    try {
+      const { email, code, password } = req.body;
 
-    const result = await resetPassword(email, code, password);
+      const result = await resetPassword(email, code, password);
 
-    if (result.error) {
-      res.status(result.error.code ?? 404).json(result);
-      return;
+      res.json(result);
+    } catch (error) {
+      const response = errorResponse(error as ErrorResponse);
+      res.status(response.status).json(response);
     }
-
-    res.json(result);
   }
 );
 
