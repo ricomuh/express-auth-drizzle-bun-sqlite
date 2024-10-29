@@ -6,7 +6,6 @@ import {
   requestResetPassword,
   verifyResetPassword,
   resetPassword,
-  getUser,
   refreshToken,
 } from "@/actions/auth";
 import type { BasicResponse } from "@/types/response";
@@ -21,6 +20,7 @@ import {
 import { authMiddleware } from "@/middleware";
 import { ErrorResponse, errorResponse } from "@/types/exceptions";
 import { getBearerToken } from "@/lib/auth";
+import { getUser } from "@/actions/user";
 
 const app: Express = express();
 
