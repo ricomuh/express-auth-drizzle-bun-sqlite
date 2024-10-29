@@ -3,12 +3,11 @@ import type { Express, Request, Response } from "express";
 import {
   login,
   register,
-  authMiddleware,
   requestResetPassword,
   verifyResetPassword,
   resetPassword,
 } from "@/actions/auth";
-import type { BasicResponse, ErrorResponse } from "@/types/response";
+import type { BasicResponse } from "@/types/response";
 import type { User, RegisterRequest, LoginRequest } from "@/types/auth";
 import {
   loginRequest,
@@ -17,6 +16,7 @@ import {
   updatePasswordRequest,
   verifyResetPasswordRequest,
 } from "@/requests/auth";
+import { authMiddleware } from "@/middleware";
 
 const app: Express = express();
 

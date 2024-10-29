@@ -4,44 +4,15 @@ import { db } from "@/db";
 import bcrypt from "bcryptjs";
 import * as schema from "@/db/schema";
 import type { LoginResponse, User } from "@/types/auth";
-import type { BasicResponse, ErrorResponse } from "@/types/response";
+import type { BasicResponse, BasicErrorResponse } from "@/types/response";
 // import jwt
 import jwt from "jsonwebtoken";
 import { sendEmail } from "./email";
-
-export async function authMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  const token = getBearerToken(req);
-
-  if (!token) {
-    res.status(401).json({
-      error: {
-        message: "Unauthorized",
-      },
-      status: 401,
-    } as ErrorResponse);
-    return;
-  }
-
-  const user = await verifyToken(token);
-
-  if (!user) {
-    res.status(401).json({
-      error: {
-        message: "Unauthorized",
-      },
-      status: 401,
-    } as ErrorResponse);
-    return;
-  }
-
-  res.locals.user = user;
-
-  next();
-}
+import {
+  ErrorResponse,
+  internalServerError,
+  UnauthorizedError,
+} from "@/types/exceptions";
 
 export async function generateToken(user: User): Promise<string> {
   const token = jwt.sign({ user }, process.env.JWT_SECRET || "", {
@@ -56,16 +27,6 @@ export async function generateToken(user: User): Promise<string> {
   });
 
   return token;
-}
-
-export function getBearerToken(req: Request): string {
-  const authorization = req.headers.authorization || "";
-  const auth = authorization.split(" ");
-  if (auth.length !== 2 || auth[0] !== "Bearer") {
-    return "";
-  }
-
-  return auth[1];
 }
 
 export async function verifyToken(token: string): Promise<User | null> {
@@ -106,234 +67,265 @@ export async function register(
   name: string,
   email: string,
   password: string
-): Promise<User | ErrorResponse> {
-  const user = await db.query.users.findFirst({
-    where: eq(schema.users.email, email),
-  });
+): Promise<User | BasicErrorResponse> {
+  try {
+    const user = await db.query.users.findFirst({
+      where: eq(schema.users.email, email),
+    });
+    if (user) {
+      throw new ErrorResponse("User already exists", 409, 409);
+    }
 
-  if (user) {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const [newUser] = await db
+      .insert(schema.users)
+      .values({
+        uuid: crypto.randomUUID(),
+        name: name,
+        email: email,
+        password: hashedPassword,
+      })
+      .returning();
+
     return {
-      error: {
-        message: "User already exists",
+      data: {
+        uuid: newUser.uuid,
+        name: newUser.name,
+        email: newUser.email,
       },
-    } as ErrorResponse;
+      message: "User created",
+      status: 201,
+    } as BasicResponse<User>;
+  } catch (error) {
+    if (error instanceof ErrorResponse) {
+      return {
+        error: {
+          message: error.message,
+          code: error.code,
+        },
+        status: error.status,
+      } as BasicErrorResponse;
+    }
+    return internalServerError;
   }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const [newUser] = await db
-    .insert(schema.users)
-    .values({
-      uuid: crypto.randomUUID(),
-      name: name,
-      email: email,
-      password: hashedPassword,
-    })
-    .returning();
-
-  return {
-    data: {
-      uuid: newUser.uuid,
-      name: newUser.name,
-      email: newUser.email,
-    },
-    message: "User created",
-    status: 201,
-  } as BasicResponse<User>;
 }
 
 export async function login(
   email: string,
   password: string
-): Promise<LoginResponse | ErrorResponse> {
-  // get user
-  const user = await db.query.users.findFirst({
-    where: eq(schema.users.email, email),
-  });
+): Promise<LoginResponse | BasicErrorResponse> {
+  try {
+    // get user
+    const user = await db.query.users.findFirst({
+      where: eq(schema.users.email, email),
+    });
 
-  if (!user) {
+    if (!user) {
+      throw new ErrorResponse("User not found", 404, 404);
+    }
+
+    const isPasswordMatch = await bcrypt.compare(
+      password,
+      user?.password || ""
+    );
+
+    if (!isPasswordMatch) {
+      throw new ErrorResponse("Invalid password", 401, 401);
+    }
+
+    // generate token
+    const token = await generateToken({
+      uuid: user.uuid,
+      name: user.name,
+      email: user.email || "",
+    });
+
+    // find user
+    const foundUser = await db.query.users.findFirst({
+      where: eq(schema.users.email, email),
+    });
+
     return {
-      error: {
-        message: "User not found",
-        code: 404,
+      data: {
+        token: token,
+        user: {
+          name: foundUser?.name || "",
+          email: foundUser?.email || "",
+        },
       },
-      status: 404,
-    } as ErrorResponse;
+      message: "Login successful",
+      status: 200,
+    } as LoginResponse;
+  } catch (error) {
+    if (error instanceof ErrorResponse) {
+      return {
+        error: {
+          message: error.message,
+          code: error.code,
+        },
+        status: error.status,
+      } as BasicErrorResponse;
+    }
+    return internalServerError;
   }
-
-  const isPasswordMatch = await bcrypt.compare(password, user?.password || "");
-
-  if (!isPasswordMatch) {
-    return {
-      error: {
-        message: "Invalid password",
-        code: 401,
-      },
-      status: 401,
-    } as ErrorResponse;
-  }
-
-  // generate token
-  const token = await generateToken({
-    uuid: user.uuid,
-    name: user.name,
-    email: user.email || "",
-  });
-
-  // find user
-  const foundUser = await db.query.users.findFirst({
-    where: eq(schema.users.email, email),
-  });
-
-  return {
-    data: {
-      token: token,
-      user: {
-        name: foundUser?.name || "",
-        email: foundUser?.email || "",
-      },
-    },
-    message: "Login successful",
-    status: 200,
-  } as LoginResponse;
 }
 
 export async function requestResetPassword(
   email: string
-): Promise<BasicResponse<null> | ErrorResponse> {
-  const user = await db.query.users.findFirst({
-    where: eq(schema.users.email, email),
-  });
+): Promise<BasicResponse<null> | BasicErrorResponse> {
+  try {
+    const user = await db.query.users.findFirst({
+      where: eq(schema.users.email, email),
+    });
 
-  if (!user) {
+    if (!user) {
+      throw new ErrorResponse("User not found", 404, 404);
+    }
+
+    const [resetPassword] = await db
+      .insert(schema.resetPasswords)
+      .values({
+        uuid: crypto.randomUUID(),
+        user_id: user.uuid,
+        code: (1000 + Math.floor(Math.random() * 9999)).toString(),
+        expires_at: new Date(Date.now() + 3600000).toISOString(),
+      })
+      .returning();
+
+    // send email
+    await sendEmail(
+      email,
+      "Reset Password",
+      `Your verification code is ${resetPassword.code}`
+    );
+
     return {
-      error: {
-        message: "User not found",
-        code: 404,
-      },
-      status: 404,
-    } as ErrorResponse;
+      message: "Reset password request sent",
+      status: 200,
+    } as BasicResponse<null>;
+  } catch (error) {
+    if (error instanceof ErrorResponse) {
+      return {
+        error: {
+          message: error.message,
+          code: error.code,
+        },
+        status: error.status,
+      } as BasicErrorResponse;
+    }
+    return internalServerError;
   }
-
-  const [resetPassword] = await db
-    .insert(schema.resetPasswords)
-    .values({
-      uuid: crypto.randomUUID(),
-      user_id: user.uuid,
-      code: (1000 + Math.floor(Math.random() * 9999)).toString(),
-      expires_at: new Date(Date.now() + 3600000).toISOString(),
-    })
-    .returning();
-
-  // send email
-  await sendEmail(
-    email,
-    "Reset Password",
-    `Your verification code is ${resetPassword.code}`
-  );
-
-  return {
-    message: "Reset password request sent",
-    status: 200,
-  } as BasicResponse<null>;
 }
 
 export async function verifyResetPassword(
   email: string,
   code: string
-): Promise<BasicResponse<null> | ErrorResponse> {
-  const user = await db.query.users.findFirst({
-    where: eq(schema.users.email, email),
-  });
+): Promise<BasicResponse<null> | BasicErrorResponse> {
+  try {
+    const user = await db.query.users.findFirst({
+      where: eq(schema.users.email, email),
+    });
 
-  if (!user) {
+    if (!user) {
+      throw new ErrorResponse("User not found", 404, 404);
+    }
+
+    const resetPassword = await db.query.resetPasswords.findFirst({
+      where: and(
+        eq(schema.resetPasswords.user_id, user.uuid),
+        eq(schema.resetPasswords.code, code)
+      ),
+    });
+
+    if (!resetPassword) {
+      return {
+        error: {
+          message: "Invalid verification code",
+          code: 401,
+        },
+        status: 401,
+      } as BasicErrorResponse;
+    }
+
+    // check if token is expired
+    if (new Date(resetPassword.expires_at || "") < new Date()) {
+      throw new ErrorResponse("Token expired", 401, 401);
+    }
+
     return {
-      error: {
-        message: "User not found",
-        code: 404,
-      },
-      status: 404,
-    } as ErrorResponse;
+      message: "Token verified",
+      status: 200,
+    } as BasicResponse<null>;
+  } catch (error) {
+    if (error instanceof ErrorResponse) {
+      return {
+        error: {
+          message: error.message,
+          code: error.code,
+        },
+        status: error.status,
+      } as BasicErrorResponse;
+    }
+    return internalServerError;
   }
-
-  const resetPassword = await db.query.resetPasswords.findFirst({
-    where: and(
-      eq(schema.resetPasswords.user_id, user.uuid),
-      eq(schema.resetPasswords.code, code)
-    ),
-  });
-
-  if (!resetPassword) {
-    return {
-      error: {
-        message: "Invalid verification code",
-        code: 401,
-      },
-      status: 401,
-    } as ErrorResponse;
-  }
-
-  // check if token is expired
-  if (new Date(resetPassword.expires_at || "") < new Date()) {
-    return {
-      error: {
-        message: "Token expired",
-        code: 401,
-      },
-      status: 401,
-    } as ErrorResponse;
-  }
-
-  return {
-    message: "Token verified",
-    status: 200,
-  } as BasicResponse<null>;
 }
 
 export async function resetPassword(
   email: string,
   code: string,
   password: string
-): Promise<BasicResponse<null> | ErrorResponse> {
-  const verify = await verifyResetPassword(email, code);
+): Promise<BasicResponse<null> | BasicErrorResponse> {
+  try {
+    const verify = await verifyResetPassword(email, code);
 
-  if (verify.error) {
-    return verify;
-  }
-  // update password
-  const hashedPassword = await bcrypt.hash(password, 10);
+    if (verify.error) {
+      throw new ErrorResponse(
+        verify.error.message,
+        verify.error.code,
+        verify.status
+      );
+    }
+    // update password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-  const user = await db.query.users.findFirst({
-    where: eq(schema.users.email, email),
-  });
+    const user = await db.query.users.findFirst({
+      where: eq(schema.users.email, email),
+    });
 
-  if (!user) {
+    if (!user) {
+      throw new ErrorResponse("User not found", 404, 404);
+    }
+
+    await db
+      .update(schema.users)
+      .set({
+        password: hashedPassword,
+      })
+      .where(eq(schema.users.uuid, user.uuid));
+
+    // remove all the tokens of this user
+    await db.delete(schema.tokens).where(eq(schema.tokens.user_id, user.uuid));
+
+    // remove the reset password token
+    await db
+      .delete(schema.resetPasswords)
+      .where(eq(schema.resetPasswords.user_id, user.uuid));
+
     return {
-      error: {
-        message: "User not found",
-        code: 404,
-      },
-      status: 404,
-    } as ErrorResponse;
+      message: "Password reset successful.",
+      status: 200,
+    } as BasicResponse<null>;
+  } catch (error) {
+    if (error instanceof ErrorResponse) {
+      return {
+        error: {
+          message: error.message,
+          code: error.code,
+        },
+        status: error.status,
+      } as BasicErrorResponse;
+    }
+    return internalServerError;
   }
-
-  await db
-    .update(schema.users)
-    .set({
-      password: hashedPassword,
-    })
-    .where(eq(schema.users.uuid, user.uuid));
-
-  // remove all the tokens of this user
-  await db.delete(schema.tokens).where(eq(schema.tokens.user_id, user.uuid));
-
-  // remove the reset password token
-  await db
-    .delete(schema.resetPasswords)
-    .where(eq(schema.resetPasswords.user_id, user.uuid));
-
-  return {
-    message: "Password reset successful.",
-    status: 200,
-  } as BasicResponse<null>;
 }

@@ -3,7 +3,7 @@ export type BasicResponse<T> = {
   message?: string;
   status: number;
 };
-export type ErrorResponse<T = null> = BasicResponse & {
+export type BasicErrorResponse<T = null> = BasicResponse & {
   error: {
     code: number;
     message: string;
