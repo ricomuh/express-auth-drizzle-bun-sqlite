@@ -9,7 +9,7 @@ import {
   getUser,
 } from "@/actions/auth";
 import type { BasicResponse } from "@/types/response";
-import type { User, RegisterRequest, LoginRequest } from "@/types/auth";
+import type { User } from "@/types/auth";
 import {
   loginRequest,
   registerRequest,
