@@ -11,6 +11,7 @@ import { sendEmail } from "./email";
 import {
   ErrorResponse,
   internalServerError,
+  NotFoundError,
   UnauthorizedError,
 } from "@/types/exceptions";
 
@@ -34,7 +35,7 @@ export async function verifyToken(token: string): Promise<User | null> {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "");
 
     if (typeof decoded === "string") {
-      return null;
+      throw new UnauthorizedError("Invalid token");
     }
 
     const user = decoded as User;
@@ -44,12 +45,12 @@ export async function verifyToken(token: string): Promise<User | null> {
     });
 
     if (!tokenExists) {
-      return null;
+      throw new UnauthorizedError("Invalid token");
     }
 
     return user;
   } catch (error) {
-    return null;
+    throw new UnauthorizedError("Invalid token");
   }
 }
 
@@ -108,13 +109,13 @@ export async function login(
   });
 
   if (!user) {
-    throw new ErrorResponse("User not found", 404, 404);
+    throw new NotFoundError("User not found");
   }
 
   const isPasswordMatch = await bcrypt.compare(password, user?.password || "");
 
   if (!isPasswordMatch) {
-    throw new ErrorResponse("Invalid password", 401, 401);
+    throw new UnauthorizedError("Invalid credentials");
   }
 
   // generate token
@@ -150,7 +151,7 @@ export async function requestResetPassword(
   });
 
   if (!user) {
-    throw new ErrorResponse("User not found", 404, 404);
+    throw new NotFoundError("User not found");
   }
 
   const [resetPassword] = await db
@@ -185,7 +186,7 @@ export async function verifyResetPassword(
   });
 
   if (!user) {
-    throw new ErrorResponse("User not found", 404, 404);
+    throw new NotFoundError("User not found");
   }
 
   const resetPassword = await db.query.resetPasswords.findFirst({
@@ -196,13 +197,7 @@ export async function verifyResetPassword(
   });
 
   if (!resetPassword) {
-    return {
-      error: {
-        message: "Invalid verification code",
-        code: 401,
-      },
-      status: 401,
-    } as BasicErrorResponse;
+    throw new ErrorResponse("Invalid code", 401, 401);
   }
 
   // check if token is expired
@@ -223,13 +218,6 @@ export async function resetPassword(
 ): Promise<BasicResponse<null> | BasicErrorResponse> {
   const verify = await verifyResetPassword(email, code);
 
-  if (verify.error) {
-    throw new ErrorResponse(
-      verify.error.message,
-      verify.error.code,
-      verify.status
-    );
-  }
   // update password
   const hashedPassword = await bcrypt.hash(password, 10);
 
