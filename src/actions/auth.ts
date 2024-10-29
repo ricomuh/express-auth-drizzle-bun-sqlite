@@ -74,7 +74,7 @@ export async function refreshToken(token: string): Promise<string | null> {
   const user = await verifyToken(token);
 
   if (!user) {
-    return null;
+    throw new UnauthorizedError("Invalid token");
   }
 
   return generateToken(user);
