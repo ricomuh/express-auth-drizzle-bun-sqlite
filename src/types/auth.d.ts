@@ -1,7 +1,7 @@
 import type { BasicResponse } from "./response";
 
 export type User = {
-  id: number;
+  uuid: string;
   name: string;
   email: string;
 };

@@ -48,7 +48,8 @@ export async function generateToken(user: User): Promise<string> {
   });
 
   await db.insert(schema.tokens).values({
-    user_id: user.id,
+    uuid: crypto.randomUUID(),
+    user_id: user.uuid,
     token: token,
     expires_at: new Date(Date.now() + 3600000).toISOString(),
   });
@@ -122,6 +123,7 @@ export async function register(
   const [newUser] = await db
     .insert(schema.users)
     .values({
+      uuid: crypto.randomUUID(),
       name: name,
       email: email,
       password: hashedPassword,
@@ -130,7 +132,7 @@ export async function register(
 
   return {
     data: {
-      id: newUser.id,
+      uuid: newUser.uuid,
       name: newUser.name,
       email: newUser.email,
     },
@@ -172,7 +174,7 @@ export async function login(
 
   // generate token
   const token = await generateToken({
-    id: user.id,
+    uuid: user.uuid,
     name: user.name,
     email: user.email || "",
   });
