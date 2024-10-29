@@ -15,6 +15,22 @@ import {
   UnauthorizedError,
 } from "@/types/exceptions";
 
+export async function getUser(uuid: string): Promise<User> {
+  const user = await db.query.users.findFirst({
+    where: eq(schema.users.uuid, uuid),
+  });
+
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  return {
+    uuid: user.uuid,
+    name: user.name,
+    email: user.email || "",
+  };
+}
+
 export async function generateToken(user: User): Promise<string> {
   const token = jwt.sign({ user }, process.env.JWT_SECRET || "", {
     expiresIn: "1h",

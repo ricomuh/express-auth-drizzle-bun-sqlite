@@ -6,6 +6,7 @@ import {
   requestResetPassword,
   verifyResetPassword,
   resetPassword,
+  getUser,
 } from "@/actions/auth";
 import type { BasicResponse } from "@/types/response";
 import type { User, RegisterRequest, LoginRequest } from "@/types/auth";
@@ -27,6 +28,37 @@ app.use(express.json());
 app.get("/", (req: Request, res: Response) => {
   res.send("Hello Guys! my name is");
 });
+
+// get user
+app.get(
+  "/user",
+  authMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    const user = res.locals.user as User;
+
+    res.json({
+      data: user,
+    } as BasicResponse<User>);
+  }
+);
+
+// get specific user
+app.get(
+  "/user/:id",
+  authMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const user = await getUser(req.params.id);
+
+      res.json({
+        data: user,
+      } as BasicResponse<User>);
+    } catch (error) {
+      const response = errorResponse(error as ErrorResponse);
+      res.status(response.status).json(response);
+    }
+  }
+);
 
 // register
 app.post(
@@ -61,19 +93,6 @@ app.post(
       const response = errorResponse(error as ErrorResponse);
       res.status(response.status).json(response);
     }
-  }
-);
-
-// get user
-app.get(
-  "/user",
-  authMiddleware,
-  async (req: Request, res: Response): Promise<void> => {
-    const user = res.locals.user as User;
-
-    res.json({
-      data: user,
-    } as BasicResponse<User>);
   }
 );
 
