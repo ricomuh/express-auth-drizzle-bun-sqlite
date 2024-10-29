@@ -1,5 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import bcrypt from "bcryptjs";
 import * as schema from "@/db/schema";
@@ -195,4 +195,121 @@ export async function login(
     message: "Login successful",
     status: 200,
   } as LoginResponse;
+}
+
+export async function requestResetPassword(
+  email: string
+): Promise<BasicResponse<null> | ErrorResponse> {
+  const user = await db.query.users.findFirst({
+    where: eq(schema.users.email, email),
+  });
+
+  if (!user) {
+    return {
+      error: {
+        message: "User not found",
+        code: 404,
+      },
+      status: 404,
+    } as ErrorResponse;
+  }
+
+  await db.insert(schema.resetPasswords).values({
+    uuid: crypto.randomUUID(),
+    user_id: user.uuid,
+    code: (1000 + Math.floor(Math.random() * 9999)).toString(),
+    expires_at: new Date(Date.now() + 3600000).toISOString(),
+  });
+
+  return {
+    message: "Reset password request sent",
+    status: 200,
+  } as BasicResponse<null>;
+}
+
+export async function verifyResetPassword(
+  email: string,
+  code: string
+): Promise<BasicResponse<null> | ErrorResponse> {
+  const user = await db.query.users.findFirst({
+    where: eq(schema.users.email, email),
+  });
+
+  if (!user) {
+    return {
+      error: {
+        message: "User not found",
+        code: 404,
+      },
+      status: 404,
+    } as ErrorResponse;
+  }
+
+  const resetPassword = await db.query.resetPasswords.findFirst({
+    where: and(
+      eq(schema.resetPasswords.user_id, user.uuid),
+      eq(schema.resetPasswords.code, code)
+    ),
+  });
+
+  if (!resetPassword) {
+    return {
+      error: {
+        message: "Invalid verification code",
+        code: 401,
+      },
+      status: 401,
+    } as ErrorResponse;
+  }
+
+  // check if token is expired
+  if (new Date(resetPassword.expires_at || "") < new Date()) {
+    return {
+      error: {
+        message: "Token expired",
+        code: 401,
+      },
+      status: 401,
+    } as ErrorResponse;
+  }
+
+  return {
+    message: "Token verified",
+    status: 200,
+  } as BasicResponse<null>;
+}
+
+export async function resetPassword(
+  email: string,
+  code: string,
+  password: string
+): Promise<BasicResponse<null> | ErrorResponse> {
+  const verify = await verifyResetPassword(email, code);
+
+  if (verify.error) {
+    return verify;
+  }
+  // update password
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const user = await db.query.users.findFirst({
+    where: eq(schema.users.email, email),
+  });
+
+  await db
+    .update(schema.users)
+    .set({
+      password: hashedPassword,
+    })
+    .where(eq(schema.users.uuid, user?.uuid || ""));
+
+  // remove all the tokens of this user
+  await db
+    .delete(schema.tokens)
+    .where(eq(schema.tokens.user_id, user?.uuid || ""));
+
+  return {
+    message: "Password reset",
+    status: 200,
+  } as BasicResponse<null>;
 }

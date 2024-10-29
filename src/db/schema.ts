@@ -21,6 +21,16 @@ export const tokens = sqliteTable("tokens", {
   updated_at: text("updated_at").$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
 });
 
+// reset_passwords table
+export const resetPasswords = sqliteTable("reset_passwords", {
+  uuid: text("uuid").primaryKey(),
+  user_id: text("user_id").notNull(),
+  code: text("code"),
+  expires_at: text("expires_at"),
+  created_at: text("created_at").default(sql`(CURRENT_TIMESTAMP)`),
+  updated_at: text("updated_at").$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
+});
+
 // tokens relations
 export const tokensRelations = relations(tokens, ({ one }) => ({
   user: one(users, {

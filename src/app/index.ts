@@ -1,9 +1,21 @@
 import express from "express";
 import type { Express, Request, Response } from "express";
-import { login, register, authMiddleware } from "@/actions/auth";
+import {
+  login,
+  register,
+  authMiddleware,
+  requestResetPassword,
+  verifyResetPassword,
+  resetPassword,
+} from "@/actions/auth";
 import type { BasicResponse, ErrorResponse } from "@/types/response";
 import type { User, RegisterRequest, LoginRequest } from "@/types/auth";
-import { loginRequest, registerRequest } from "@/requests/auth";
+import {
+  loginRequest,
+  registerRequest,
+  resetPasswordRequest,
+  verifyResetPasswordRequest,
+} from "@/requests/auth";
 
 const app: Express = express();
 
@@ -16,7 +28,7 @@ app.get("/", (req: Request, res: Response) => {
 
 // register
 app.post(
-  "/register",
+  "/auth/register",
   registerRequest,
   async (req: Request, res: Response): Promise<void> => {
     const { name, email, password } = req.body;
@@ -34,7 +46,7 @@ app.post(
 
 // login
 app.post(
-  "/login",
+  "/auth/login",
   loginRequest,
   async (req: Request, res: Response): Promise<void> => {
     const { email, password } = req.body;
@@ -60,6 +72,60 @@ app.get(
     res.json({
       data: user,
     } as BasicResponse<User>);
+  }
+);
+
+// reset password request
+app.post(
+  "/reset-password/request",
+  resetPasswordRequest,
+  async (req: Request, res: Response): Promise<void> => {
+    const { email } = req.body;
+
+    const result = await requestResetPassword(email);
+
+    if (result.error) {
+      res.status(result.error.code ?? 404).json(result);
+      return;
+    }
+
+    res.json(result);
+  }
+);
+
+// verify reset password token
+app.post(
+  "/reset-password/verify",
+  verifyResetPasswordRequest,
+  async (req: Request, res: Response): Promise<void> => {
+    const { email, code } = req.body;
+
+    const result = await verifyResetPassword(email, code);
+
+    if (result.error) {
+      res.status(result.error.code ?? 404).json(result);
+      return;
+    }
+
+    res.json(result);
+  }
+);
+
+// reset password
+app.post(
+  "/reset-password",
+  resetPasswordRequest,
+  async (req: Request, res: Response): Promise<void> => {
+    const { email, code, password } = req.body;
+
+    const result = await resetPassword(email, code, password);
+
+    if (result.error) {
+      res.status(result.error.code ?? 404).json(result);
+      return;
+    }
+
+    res.json(result);
   }
 );
 

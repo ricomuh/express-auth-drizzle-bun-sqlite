@@ -8,6 +8,20 @@
       "when": 1730216662505,
       "tag": "0000_chilly_cyclops",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1730216967300,
+      "tag": "0001_fancy_inhumans",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1730218046570,
+      "tag": "0002_lethal_dark_phoenix",
+      "breakpoints": true
     }
   ]
 }
