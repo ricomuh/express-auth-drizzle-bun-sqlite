@@ -3,7 +3,7 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
 // users table
 export const users = sqliteTable("users", {
-  id: integer("id").primaryKey(),
+  uuid: text("uuid").primaryKey(),
   name: text("name").notNull(),
   email: text("email").unique(),
   password: text("password").notNull(),
@@ -13,8 +13,8 @@ export const users = sqliteTable("users", {
 
 // tokens table
 export const tokens = sqliteTable("tokens", {
-  id: integer("id").primaryKey(),
-  user_id: integer("user_id"),
+  uuid: text("uuid").primaryKey(),
+  user_id: text("user_id").notNull(),
   token: text("token"),
   expires_at: text("expires_at"),
   created_at: text("created_at").default(sql`(CURRENT_TIMESTAMP)`),
@@ -25,6 +25,6 @@ export const tokens = sqliteTable("tokens", {
 export const tokensRelations = relations(tokens, ({ one }) => ({
   user: one(users, {
     fields: [tokens.user_id],
-    references: [users.id],
+    references: [users.uuid],
   }),
 }));
