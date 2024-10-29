@@ -176,3 +176,4 @@ dist
 
 # Database files
 *.sqlite
+*.db
