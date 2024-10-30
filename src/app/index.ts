@@ -54,6 +54,7 @@ app.get(
 
       res.json({
         data: user,
+        message: "User found",
       } as BasicResponse<User>);
     } catch (error) {
       const response = errorResponse(error as ErrorResponse);
