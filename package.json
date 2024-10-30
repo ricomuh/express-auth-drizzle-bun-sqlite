@@ -33,6 +33,7 @@
     "zod-express-middleware": "^1.4.0"
   },
   "scripts": {
+    "start": "bun run ./src/index.ts",
     "dev": "bun --hot ./src/index.ts",
     "migrate": "bunx drizzle-kit generate --dialect sqlite --schema ./src/db/schema.ts && bun run ./src/db/migrate.ts",
     "seed": "bun run ./src/db/seed.ts"
